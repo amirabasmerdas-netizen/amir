@@ -2,7 +2,7 @@ import os
 import logging
 import sqlite3
 from fastapi import FastAPI, Request
-from aiogram import Bot, Dispatcher, types, F, Update
+from aiogram import Bot, Dispatcher, types, Update
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -18,7 +18,6 @@ logging.basicConfig(level=logging.INFO)
 # ================== دیتابیس ==================
 conn = sqlite3.connect("settings.db", check_same_thread=False)
 cur = conn.cursor()
-
 cur.execute("""
 CREATE TABLE IF NOT EXISTS config (
     id INTEGER PRIMARY KEY,
@@ -71,8 +70,8 @@ async def all_messages(message: types.Message, state: FSMContext):
     if not is_admin(message.from_user.id):
         return
 
-    # ===== /start =====
-    if message.text == "/start":
+    # ===== هندلر /start =====
+    if message.text and message.text.strip() == "/start":
         await message.answer("پنل مدیریت ربات:", reply_markup=main_menu_keyboard())
         return
 
@@ -109,7 +108,7 @@ async def all_messages(message: types.Message, state: FSMContext):
         await message.answer("پنل اصلی:", reply_markup=main_menu_keyboard())
         return
 
-    # ===== FSM ذخیره گروه‌ها =====
+    # ===== FSM ذخیره گروه‌ها با چک واقعی =====
     current_state = await state.get_state()
     if current_state == ForwardState.waiting_source.state:
         if not is_valid_username(message.text):
