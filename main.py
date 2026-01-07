@@ -11,7 +11,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 # ================== تنظیمات ==================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # بدون / آخر
 
 WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
 
@@ -25,7 +25,8 @@ cur.execute("""
 CREATE TABLE IF NOT EXISTS config (
     id INTEGER PRIMARY KEY,
     source TEXT,
-    destination TEXT
+    destination TEXT,
+    forward_active INTEGER DEFAULT 0
 )
 """)
 cur.execute("INSERT OR IGNORE INTO config (id) VALUES (1)")
@@ -39,8 +40,12 @@ def set_destination(val):
     cur.execute("UPDATE config SET destination=? WHERE id=1", (val,))
     conn.commit()
 
+def set_forward_status(status: int):
+    cur.execute("UPDATE config SET forward_active=? WHERE id=1", (status,))
+    conn.commit()
+
 def get_config():
-    cur.execute("SELECT source, destination FROM config WHERE id=1")
+    cur.execute("SELECT source, destination, forward_active FROM config WHERE id=1")
     return cur.fetchone()
 
 # ================== FSM ==================
@@ -64,6 +69,8 @@ def g2g_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🔹 گروه مبدا", callback_data="set_source")],
         [InlineKeyboardButton(text="🔸 گروه مقصد", callback_data="set_destination")],
+        [InlineKeyboardButton(text="▶️ شروع فوروارد", callback_data="start_forward")],
+        [InlineKeyboardButton(text="⏹ توقف فوروارد", callback_data="stop_forward")],
         [InlineKeyboardButton(text="🔙 بازگشت", callback_data="back")]
     ])
 
@@ -75,7 +82,7 @@ def is_valid_username(text: str):
     return text.startswith("@") and len(text) > 1 and " " not in text
 
 # ================== دستورات ==================
-@dp.message(F.text == "/start")
+@dp.message(F.text.startswith("/start"))
 async def start_cmd(message: types.Message):
     if not is_admin(message.from_user.id):
         return await message.answer("⛔ شما دسترسی ندارید")
@@ -131,11 +138,22 @@ async def save_destination(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer("✅ گروه مقصد ثبت شد")
 
-# ================== فوروارد ==================
+# ================== شروع / توقف فوروارد ==================
+@dp.callback_query(F.data == "start_forward")
+async def start_forward(callback: types.CallbackQuery):
+    set_forward_status(1)
+    await callback.answer("▶️ فوروارد فعال شد", show_alert=True)
+
+@dp.callback_query(F.data == "stop_forward")
+async def stop_forward(callback: types.CallbackQuery):
+    set_forward_status(0)
+    await callback.answer("⏹ فوروارد متوقف شد", show_alert=True)
+
+# ================== فوروارد واقعی ==================
 @dp.message()
 async def auto_forward(message: types.Message):
-    source, destination = get_config()
-    if not source or not destination:
+    source, destination, forward_active = get_config()
+    if not forward_active:
         return
 
     if not message.chat.username:
@@ -150,11 +168,13 @@ async def auto_forward(message: types.Message):
 # ================== Webhook ==================
 @app.on_event("startup")
 async def on_startup():
-    await bot.set_webhook(f"{WEBHOOK_URL}{WEBHOOK_PATH}")
+    await bot.set_webhook(f"{WEBHOOK_URL}/webhook/{BOT_TOKEN}")
 
-@app.post(WEBHOOK_PATH)
+@app.post(f"/webhook/{BOT_TOKEN}")
 async def telegram_webhook(request: Request):
-    update = Update.model_validate(await request.json(), context={"bot": bot})
+    data = await request.json()
+    logging.info(f"UPDATE: {data}")
+    update = Update.model_validate(data, context={"bot": bot})
     await dp.feed_update(bot, update)
     return {"ok": True}
 
