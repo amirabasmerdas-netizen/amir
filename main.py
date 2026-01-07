@@ -9,8 +9,8 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
 # ================== تنظیمات ==================
-BOT_TOKEN = os.getenv("8275637960:AAGVhL33pMp0vXRdgXzfaZqF5rYuHwDfrPw")
-ADMIN_ID = int(os.getenv("8588773170"))
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
